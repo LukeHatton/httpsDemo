@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="https://www.thymeleaf.org">
-  <head>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:th="https://www.thymeleaf.org">
+<head>
     <title>OpenAI Quickstart</title>
     <link
-      rel="shortcut icon"
-      href="${#mvc.url('classpath:/static/dog.png')}"
+            rel="shortcut icon"
+            th:href="@{/static/dog.png}"
     />
-    <link rel="stylesheet" href="${#mvc.url('classpath:/static/main.css')}" />
-  </head>
+    <link rel="stylesheet" th:href="@{/static/main.css}"/>
+</head>
 
-  <body>
-    <img src="${#mvc.url('classpath:/static/dog.png')}" class="icon" />
-    <h3>Name my pet</h3>
-    <form action="/" method="post">
-      <input type="text" name="animal" placeholder="Enter an animal" required />
-      <input type="submit" value="Generate names" />
-    </form>
-    {% if result %}
-    <div class="result">{{ result }}</div>
-    {% endif %}
-  </body>
+<body>
+<img th:src="@{/static/dog.png}" class="icon" alt="狗狗" src=""/>
+<h3>Ask Me Questions!</h3>
+<form action="#" th:action="@{/index}" th:object="${formData}" method="post">
+    <input type="text" id="question" name="question" th:field="*{content}"
+           placeholder="your question here" required/>
+    <input type="password" id="apikey" name="apikey" th:field="*{apiKey}" required>
+    <input type="submit" value="submit"/>
+</form>
+
+<div class="result">
+    <span th:text="${result!=null?result:''}"></span>
+</div>
+</body>
 </html>
