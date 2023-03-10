@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.thymeleaf.util.StringUtils;
 
+import javax.servlet.http.HttpSession;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Date;
@@ -100,30 +101,60 @@ public class JumpController {
   }
 
   @PostMapping("/index")
-  public String submitIndex(@ModelAttribute OpenAiModel formData, ModelMap modelMap) {
-    log.info("==> 接收到表单提交数据：api-key={}, content={}", formData.getApiKey(), formData.getContent());
+  public String submitIndex(@ModelAttribute OpenAiModel formData,
+                            ModelMap modelMap,
+                            HttpSession session) {
+
+    /* ================ 构建请求 ================= */
+    String apiKey = formData.getApiKey();
+    String content = formData.getContent();
+    log.info("==> 接收到表单提交数据：api-key={}, content={}", apiKey, content);
     ChatCompletionRequest request = ChatCompletionRequest.builder()
       .model("gpt-3.5-turbo")
-      .messages(Collections.singletonList(new ChatMessage("user", formData.getContent())))
+      .messages(Collections.singletonList(new ChatMessage("user", content)))
       .temperature(0.6)
       .maxTokens(2048)
       .build();
-    log.info("==> 已发送请求，请耐心等待响应...");
+
+    /* ================ 发送请求 ================= */
+    // OpenAiService这个对象的生命周期应与用户session相同
     StopWatch watch = new StopWatch();
     watch.start();
-    // OpenAiService这个对象的生命周期应与用户session相同，下面的这种实现相当于每个请求都重新创建一个实例，会对性能造成影响
-    OpenAiService openAiService = new OpenAiService("", Duration.ofSeconds(60));
+    OpenAiService openAiService = getFromSession(session, apiKey);
+    log.info("==> 已发送请求，请耐心等待响应...");
     ChatCompletionResult result = openAiService.createChatCompletion(request);
     watch.stop();
     log.info("==> 已收到响应，耗时：{}s", watch.getTotalTimeSeconds());
 
+    /* ============= Model & View ============== */
     modelMap.addAttribute("formData", formData);
-    if (StringUtils.isEmpty(formData.getApiKey()))
+    if (StringUtils.isEmpty(apiKey))
       modelMap.addAttribute("result", "您提供的api-key不正确，请确认！");
     else
       modelMap.addAttribute("result", result.getChoices().get(0).getMessage().getContent());
-
     return "index";
+  }
+
+  /**
+   * 从HttpSession取得{@link OpenAiService}对象
+   * 之所以这个对象要存储在session中，是为了降低每次处理用户请求时的开销
+   *
+   * @param session 当前用户的session
+   * @param key     用户提交的api-key
+   * @return 使用用户api-key创建的OpenAiService对象
+   */
+  private OpenAiService getFromSession(HttpSession session, String key) {
+    OpenAiService service;                  // OpenAiService这个对象的生命周期应与用户session相同
+    if (session.getAttribute("openAiService") == null) {
+      service = new OpenAiService(key, Duration.ofSeconds(60));
+      session.setAttribute("openAiService", service);
+      log.info("==> 新建OpenAiService对象");
+    }
+    else {
+      service = (OpenAiService) session.getAttribute("openAiService");
+      log.info("==> 从用户session中取得OpenAiService对象");
+    }
+    return service;
   }
 
 }
