@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:th="https://www.thymeleaf.org"
+      xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity5" lang="en">
+<head>
+    <title>Hello World!</title>
+</head>
+<body>
+<!-- 通过thymeleaf与spring security的集成，只有经过认证的用户才能看到"thymeleaf"字符串 -->
+<h1 th:inline="text">Hello <span th:remove="tag" sec:authentication="name"></span>!</h1>
+<div sec:authorize="hasRole('USER')">具有角色"USER"的用户可见</div>
+<div sec:authorize="isAuthenticated()">经过认证的用户可见</div>
+经过认证的用户名：
+<span sec:authentication="name">用户名</span>
+经过认证的用户角色：
+<span sec:authentication="authorities">角色信息</span>
+<form th:action="@{/logout}" method="post">
+    <input type="submit" value="Sign Out"/>
+</form>
+</body>
+</html>
