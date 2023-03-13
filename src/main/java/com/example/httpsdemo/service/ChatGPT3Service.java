@@ -31,8 +31,9 @@ public interface ChatGPT3Service {
   /**
    * 调用模型，并获取响应结果。由于调用模型可能耗时较长，本方法需要支持异步调用
    *
+   * @param service {@link OpenAiService}对象
    * @param request {@link ChatCompletionRequest}对象
    * @return {@link ChatCompletionResult}的Future对象
    */
-  Future<ChatCompletionResult> getChatResult(ChatCompletionRequest request);
+  Future<ChatCompletionResult> getChatResult(OpenAiService service, ChatCompletionRequest request);
 }

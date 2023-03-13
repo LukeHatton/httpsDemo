@@ -2,6 +2,7 @@ package com.example.httpsdemo.controller;
 
 import com.example.httpsdemo.model.FormData;
 import com.example.httpsdemo.model.OpenAiModel;
+import com.example.httpsdemo.service.ChatGPT3Service;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatCompletionResult;
 import com.theokanning.openai.completion.chat.ChatMessage;
@@ -10,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
-import org.springframework.util.StopWatch;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,10 +18,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.thymeleaf.util.StringUtils;
 
 import javax.servlet.http.HttpSession;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  * <p>Project: httpsDemo
@@ -34,6 +35,12 @@ import java.util.Map;
 @Controller
 @Slf4j
 public class JumpController {
+
+  private final ChatGPT3Service chatGPT3Service;
+
+  public JumpController(ChatGPT3Service chatGPT3Service) {
+    this.chatGPT3Service = chatGPT3Service;
+  }
 
   @GetMapping("/showViewPage")
   public String showPage(Model model) {
@@ -100,6 +107,16 @@ public class JumpController {
     return "index";
   }
 
+  /**
+   * 调用ChatCompletion模型，进行简单的聊天
+   * <p>
+   *   调用这个模型，无法利用代码生成功能，可能需要单独调用Codex模型
+   *
+   * @param formData 表单数据，包含api key和请求内容
+   * @param modelMap modelMap
+   * @param session  HttpSession
+   * @return index.html
+   */
   @PostMapping("/index")
   public String submitIndex(@ModelAttribute OpenAiModel formData,
                             ModelMap modelMap,
@@ -118,43 +135,24 @@ public class JumpController {
 
     /* ================ 发送请求 ================= */
     // OpenAiService这个对象的生命周期应与用户session相同
-    StopWatch watch = new StopWatch();
-    watch.start();
-    OpenAiService openAiService = getFromSession(session, apiKey);
+    OpenAiService openAiService = chatGPT3Service.getServiceFromSession(session, apiKey);
     log.info("==> 已发送请求，请耐心等待响应...");
-    ChatCompletionResult result = openAiService.createChatCompletion(request);
-    watch.stop();
-    log.info("==> 已收到响应，耗时：{}s", watch.getTotalTimeSeconds());
+    Future<ChatCompletionResult> result = chatGPT3Service.getChatResult(openAiService, request);
+
 
     /* ============= Model & View ============== */
     modelMap.addAttribute("formData", formData);
     if (StringUtils.isEmpty(apiKey))
       modelMap.addAttribute("result", "您提供的api-key不正确，请确认！");
-    else
-      modelMap.addAttribute("result", result.getChoices().get(0).getMessage().getContent());
-    return "index";
-  }
-
-  /**
-   * 从HttpSession取得{@link OpenAiService}对象
-   * 之所以这个对象要存储在session中，是为了降低每次处理用户请求时的开销
-   *
-   * @param session 当前用户的session
-   * @param key     用户提交的api-key
-   * @return 使用用户api-key创建的OpenAiService对象
-   */
-  private OpenAiService getFromSession(HttpSession session, String key) {
-    OpenAiService service;                  // OpenAiService这个对象的生命周期应与用户session相同
-    if (session.getAttribute("openAiService") == null) {
-      service = new OpenAiService(key, Duration.ofSeconds(60));
-      session.setAttribute("openAiService", service);
-      log.info("==> 新建OpenAiService对象");
-    }
     else {
-      service = (OpenAiService) session.getAttribute("openAiService");
-      log.info("==> 从用户session中取得OpenAiService对象");
+      try {
+        modelMap.addAttribute("result", result.get().getChoices().get(0).getMessage().getContent());
+      } catch (InterruptedException | ExecutionException e) {
+        log.error("==> 异步调用ChatGPT API异常", e);
+        modelMap.addAttribute("result", "后端服务异常！请联系管理员或稍后重试");
+      }
     }
-    return service;
+    return "index";
   }
 
 }
