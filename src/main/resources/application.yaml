@@ -7,3 +7,11 @@ spring:
     encoding: UTF-8 # 指定字符集编码
   mvc:
     static-path-pattern: /static/** # js ,css 等静态文件路径
+  data:
+    mongodb:
+      host:
+      port:
+      username:
+      password:
+      database:
+      authentication-database: admin    # 必须使用admin数据库进行用户认证，否则会导致MongoDB连接认证失败
