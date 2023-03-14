@@ -1,6 +1,6 @@
 package com.example.httpsdemo.controller;
 
-import com.example.httpsdemo.model.OpenAiModel;
+import com.example.httpsdemo.model.dto.OpenAiDto;
 import com.example.httpsdemo.service.ChatGPT3Service;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatCompletionResult;
@@ -39,7 +39,7 @@ public class JumpController {
 
   @GetMapping("/index")
   public String toIndex(ModelMap modelMap) {
-    modelMap.addAttribute("formData", new OpenAiModel());
+    modelMap.addAttribute("formData", new OpenAiDto());
     return "index";
   }
 
@@ -54,7 +54,7 @@ public class JumpController {
    * @return index.html
    */
   @PostMapping("/index")
-  public String submitIndex(@ModelAttribute OpenAiModel formData,
+  public String submitIndex(@ModelAttribute OpenAiDto formData,
                             ModelMap modelMap,
                             HttpSession session) {
 

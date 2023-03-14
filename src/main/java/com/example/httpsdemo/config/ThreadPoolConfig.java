@@ -1,4 +1,4 @@
-package com.example.httpsdemo.controller.config;
+package com.example.httpsdemo.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

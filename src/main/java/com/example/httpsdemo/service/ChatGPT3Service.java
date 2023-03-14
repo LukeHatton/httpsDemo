@@ -12,7 +12,7 @@ import java.util.concurrent.Future;
  * <p>description:
  * ChatGPT 3.5 API服务接口
  * <p>之所以按照API版本命名，是因为ChatGPT的开发者接口一直在更新，且Java客户端由个人开发者维护，随时可能发生大的版本更改，
- * 因此需要准备好在进行大的版本更新时换用不同的接口
+ * 因此需要准备好在进行大的版本更新时换用不同的接口实现类
  *
  * @author : consi
  * @since : 2023/3/12
