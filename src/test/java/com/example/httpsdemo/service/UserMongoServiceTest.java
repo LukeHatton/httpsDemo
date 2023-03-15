@@ -1,4 +1,4 @@
-package com.example.httpsdemo;
+package com.example.httpsdemo.service;
 
 import com.example.httpsdemo.model.dao.UserDao;
 import com.example.httpsdemo.service.mongo.UserMongoService;

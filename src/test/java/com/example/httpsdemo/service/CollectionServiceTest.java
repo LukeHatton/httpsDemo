@@ -1,4 +1,4 @@
-package com.example.httpsdemo;
+package com.example.httpsdemo.service;
 
 import com.example.httpsdemo.service.mongo.CollectionService;
 import lombok.extern.slf4j.Slf4j;
