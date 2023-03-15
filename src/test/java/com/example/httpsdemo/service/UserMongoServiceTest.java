@@ -36,7 +36,7 @@ public class UserMongoServiceTest {
 
   @Test
   void findAll() {
-    List<UserDao> user = mongoService.findAll("user");
+    List<UserDao> user = mongoService.findAll();
     log.info(user.toString());
   }
 

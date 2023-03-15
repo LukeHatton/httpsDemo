@@ -23,11 +23,20 @@ public class IdGeneratorTest {
   @Autowired
   private SnowflakeGenerator snowflakeGenerator;
 
+  /**
+   * 测试生成SnowFlake ID，断言id的时序关系可以直接通过比较id大小得出
+   *
+   * @throws InterruptedException 线程睡眠中被中断
+   */
   @Test
-  void next() {
-    Long next = snowflakeGenerator.next();
-    log.info("==> 测试生成雪花算法ID: {}", next);
-    assert next != 0;
+  void next() throws InterruptedException {
+    for (int i = 0; i < 10; i++) {
+      Long next = snowflakeGenerator.next();
+      Thread.sleep(100);
+      Long next1 = snowflakeGenerator.next();
+      log.info("==> 测试生成雪花算法ID: {}, {}", next, next1);
+      assert next1 > next;
+    }
   }
 
 }

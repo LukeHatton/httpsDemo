@@ -11,6 +11,8 @@ import lombok.Data;
  */
 @Data
 public class OpenAiDto {
+  String objectId;
+
   String apiKey;
 
   String content;

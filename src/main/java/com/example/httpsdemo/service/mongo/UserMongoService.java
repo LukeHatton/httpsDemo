@@ -1,8 +1,8 @@
 package com.example.httpsdemo.service.mongo;
 
 import com.example.httpsdemo.model.dao.UserDao;
+import com.example.httpsdemo.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,23 +18,23 @@ import java.util.List;
 @Slf4j
 public class UserMongoService {
 
-  private final MongoTemplate mongoTemplate;
+  private final UserRepository userRepository;
 
-  public UserMongoService(MongoTemplate mongoTemplate) {
-    this.mongoTemplate = mongoTemplate;
+  public UserMongoService(UserRepository userRepository) {
+    this.userRepository = userRepository;
   }
 
-  public List<UserDao> findAll(String collectionName) {
-    return mongoTemplate.findAll(UserDao.class);
+  public List<UserDao> findAll() {
+    return userRepository.findAll();
   }
 
   public void insertOne(UserDao user) {
-    UserDao insert = mongoTemplate.insert(user);
+    UserDao insert = userRepository.insert(user);
     log.info("【mongo】插入的用户信息：{}", insert);
   }
 
   public Integer insertMany(List<UserDao> list) {
-    List<UserDao> insert = mongoTemplate.insert(list);
+    List<UserDao> insert = userRepository.insert(list);
     return insert.size();
   }
 }

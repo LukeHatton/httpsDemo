@@ -1,7 +1,10 @@
 package com.example.httpsdemo.controller;
 
+import com.example.httpsdemo.model.dao.MessageContextDao;
 import com.example.httpsdemo.model.dto.OpenAiDto;
+import com.example.httpsdemo.repository.MessageContextRepository;
 import com.example.httpsdemo.service.ChatGPT3Service;
+import com.example.httpsdemo.service.mongo.MessageContextMongoService;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatCompletionResult;
 import com.theokanning.openai.completion.chat.ChatMessage;
@@ -15,7 +18,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.thymeleaf.util.StringUtils;
 
 import javax.servlet.http.HttpSession;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -30,11 +35,18 @@ import java.util.concurrent.Future;
 @Controller
 @Slf4j
 public class JumpController {
+  private final MessageContextRepository messageContextRepository;
 
   private final ChatGPT3Service chatGPT3Service;
 
-  public JumpController(ChatGPT3Service chatGPT3Service) {
+  private final MessageContextMongoService messageContextMongoService;
+
+  public JumpController(ChatGPT3Service chatGPT3Service,
+                        MessageContextMongoService messageContextMongoService,
+                        MessageContextRepository messageContextRepository) {
     this.chatGPT3Service = chatGPT3Service;
+    this.messageContextMongoService = messageContextMongoService;
+    this.messageContextRepository = messageContextRepository;
   }
 
   @GetMapping("/index")
@@ -46,22 +58,31 @@ public class JumpController {
   /**
    * 调用ChatCompletion模型，进行简单的聊天
    * <p>
-   *   调用这个模型，无法利用代码生成功能，可能需要单独调用Codex模型
+   * 调用这个模型，无法利用代码生成功能，可能需要单独调用Codex模型
    *
-   * @param formData 表单数据，包含api key和请求内容
-   * @param modelMap modelMap
-   * @param session  HttpSession
+   * @param openAiDto 表单数据，包含api key和请求内容
+   * @param modelMap  modelMap
+   * @param session   HttpSession
    * @return index.html
    */
   @PostMapping("/index")
-  public String submitIndex(@ModelAttribute OpenAiDto formData,
+  public String submitIndex(@ModelAttribute OpenAiDto openAiDto,
                             ModelMap modelMap,
                             HttpSession session) {
 
     /* ================ 构建请求 ================= */
-    String apiKey = formData.getApiKey();
-    String content = formData.getContent();
-    log.info("==> 接收到表单提交数据：api-key={}, content={}", apiKey, content);
+    String objectId = openAiDto.getObjectId();
+    String apiKey = openAiDto.getApiKey();
+    String content = openAiDto.getContent();
+    log.info("==> 接收到表单提交数据：objectId={}, api-key={}, content={}", objectId, apiKey, content);
+    List<ChatMessage> messageList = new ArrayList<>();
+    // TODO 1. 根据objectId查询出上下文信息
+    MessageContextDao messageContextDao = messageContextMongoService.findWithId(objectId);
+    if (messageContextDao != null) {                     // 只有根据id查询结果不为null的情况下才需要解析报文
+      // TODO 2. 解析上下文json，封装为ChatMessage列表
+
+    }
+
     ChatCompletionRequest request = ChatCompletionRequest.builder()
       .model("gpt-3.5-turbo")
       .messages(Collections.singletonList(new ChatMessage("user", content)))
@@ -77,7 +98,7 @@ public class JumpController {
 
 
     /* ============= Model & View ============== */
-    modelMap.addAttribute("formData", formData);
+    modelMap.addAttribute("formData", openAiDto);
     if (StringUtils.isEmpty(apiKey))
       modelMap.addAttribute("result", "您提供的api-key不正确，请确认！");
     else {
@@ -90,5 +111,6 @@ public class JumpController {
     }
     return "index";
   }
+
 
 }

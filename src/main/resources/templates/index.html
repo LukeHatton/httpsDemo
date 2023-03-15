@@ -15,6 +15,7 @@
 <form action="#" th:action="@{/index}" th:object="${formData}" method="post">
     <input type="text" id="question" name="question" th:field="*{content}"
            placeholder="your question here" required/>
+    <input type="hidden" id="objectId" name="objectId" th:value="${objectId}">
     <input type="password" id="apikey" name="apikey" th:field="*{apiKey}" required>
     <input type="submit" value="submit"/>
 </form>
