@@ -2,9 +2,8 @@ package com.example.httpsdemo.controller;
 
 import com.example.httpsdemo.model.dao.MessageContextDao;
 import com.example.httpsdemo.model.dto.OpenAiDto;
-import com.example.httpsdemo.repository.MessageContextRepository;
 import com.example.httpsdemo.service.ChatGPT3Service;
-import com.example.httpsdemo.service.mongo.MessageContextMongoService;
+import com.example.httpsdemo.service.mongo.MessageContextService;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatCompletionResult;
 import com.theokanning.openai.completion.chat.ChatMessage;
@@ -18,8 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.thymeleaf.util.StringUtils;
 
 import javax.servlet.http.HttpSession;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -35,18 +32,15 @@ import java.util.concurrent.Future;
 @Controller
 @Slf4j
 public class JumpController {
-  private final MessageContextRepository messageContextRepository;
 
   private final ChatGPT3Service chatGPT3Service;
 
-  private final MessageContextMongoService messageContextMongoService;
+  private final MessageContextService messageContextService;
 
   public JumpController(ChatGPT3Service chatGPT3Service,
-                        MessageContextMongoService messageContextMongoService,
-                        MessageContextRepository messageContextRepository) {
+                        MessageContextService messageContextService) {
     this.chatGPT3Service = chatGPT3Service;
-    this.messageContextMongoService = messageContextMongoService;
-    this.messageContextRepository = messageContextRepository;
+    this.messageContextService = messageContextService;
   }
 
   @GetMapping("/index")
@@ -75,17 +69,14 @@ public class JumpController {
     String apiKey = openAiDto.getApiKey();
     String content = openAiDto.getContent();
     log.info("==> 接收到表单提交数据：objectId={}, api-key={}, content={}", objectId, apiKey, content);
-    List<ChatMessage> messageList = new ArrayList<>();
-    // TODO 1. 根据objectId查询出上下文信息
-    MessageContextDao messageContextDao = messageContextMongoService.findWithId(objectId);
-    if (messageContextDao != null) {                     // 只有根据id查询结果不为null的情况下才需要解析报文
-      // TODO 2. 解析上下文json，封装为ChatMessage列表
-
-    }
+    // 将缩略上下文封装到模型上下文List中
+    MessageContextDao messageContextDao = messageContextService.findWithId(objectId);
+    List<ChatMessage> chatMessageList = messageContextService.getSummaryListFromMessageContext(messageContextDao);
+    chatMessageList.add(new ChatMessage("user", content));
 
     ChatCompletionRequest request = ChatCompletionRequest.builder()
       .model("gpt-3.5-turbo")
-      .messages(Collections.singletonList(new ChatMessage("user", content)))
+      .messages(chatMessageList)
       .temperature(0.6)
       .maxTokens(2048)
       .build();
@@ -95,6 +86,13 @@ public class JumpController {
     OpenAiService openAiService = chatGPT3Service.getServiceFromSession(session, apiKey);
     log.info("==> 已发送请求，请耐心等待响应...");
     Future<ChatCompletionResult> result = chatGPT3Service.getChatResult(openAiService, request);
+
+    /* ================ 回写数据 ================= */
+    /*
+     * 当得到响应后，需要将用户的问题与AI回答原文、缩略更新到MongoDB中
+     * 这个操作可以异步完成
+     */
+
 
 
     /* ============= Model & View ============== */
@@ -111,6 +109,5 @@ public class JumpController {
     }
     return "index";
   }
-
 
 }

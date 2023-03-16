@@ -16,11 +16,11 @@ import java.util.List;
  */
 @Service
 @Slf4j
-public class UserMongoService {
+public class UserService {
 
   private final UserRepository userRepository;
 
-  public UserMongoService(UserRepository userRepository) {
+  public UserService(UserRepository userRepository) {
     this.userRepository = userRepository;
   }
 

@@ -1,7 +1,7 @@
 package com.example.httpsdemo.service;
 
 import com.example.httpsdemo.model.dao.UserDao;
-import com.example.httpsdemo.service.mongo.UserMongoService;
+import com.example.httpsdemo.service.mongo.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,10 +22,10 @@ import java.util.List;
 @SpringBootTest
 @ExtendWith(SpringExtension.class)
 @Slf4j
-public class UserMongoServiceTest {
+public class UserServiceTest {
 
   @Autowired
-  UserMongoService mongoService;
+  UserService mongoService;
 
   @Test
   void insertOne() {
