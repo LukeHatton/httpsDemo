@@ -1,14 +1,17 @@
 package com.example.httpsdemo.controller;
 
+import com.example.httpsdemo.config.enums.FinishReasons;
 import com.example.httpsdemo.model.dao.MessageContextDao;
 import com.example.httpsdemo.model.dto.OpenAiDto;
 import com.example.httpsdemo.service.ChatGPT3Service;
 import com.example.httpsdemo.service.mongo.MessageContextService;
+import com.theokanning.openai.completion.chat.ChatCompletionChoice;
 import com.theokanning.openai.completion.chat.ChatCompletionRequest;
 import com.theokanning.openai.completion.chat.ChatCompletionResult;
 import com.theokanning.openai.completion.chat.ChatMessage;
 import com.theokanning.openai.service.OpenAiService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +35,9 @@ import java.util.concurrent.Future;
 @Controller
 @Slf4j
 public class JumpController {
+
+  @Value("${application.apiKey}")
+  private String key;
 
   private final ChatGPT3Service chatGPT3Service;
 
@@ -66,13 +72,12 @@ public class JumpController {
 
     /* ================ 构建请求 ================= */
     String objectId = openAiDto.getObjectId();
-    // String apiKey = openAiDto.getApiKey();
-    String apiKey = "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";  // 暂且使用固定的api-key
+    String apiKey = key;
     String content = openAiDto.getContent();
     log.info("==> 接收到表单提交数据：objectId={}, api-key={}, content={}", objectId, apiKey, content);
     /*
-     * 如果object==null，说明这是一个新请求，应获取初始问题模板
-     * 而若object!=null，说明这是一个在某个上下文中的请求，应查询数据库获取其上下文信息
+     * 如果objectId==null，说明这是一个新请求，应获取初始问题模板
+     * 而若objectId!=null，说明这是一个在某个上下文中的请求，应查询数据库获取其上下文信息
      * 无论如何，这个信息都应被封装为一个ChatMessage的List。这个操作应当在service层完成
      * 输入：objectId  输出：List<ChatMessage>
      */
@@ -95,29 +100,37 @@ public class JumpController {
     // OpenAiService这个对象的生命周期应与用户session相同
     OpenAiService openAiService = chatGPT3Service.getServiceFromSession(session, apiKey);
     log.info("==> 已发送请求，请耐心等待响应...");
-    Future<ChatCompletionResult> result = chatGPT3Service.getChatResult(openAiService, request);
+    Future<ChatCompletionResult> resultFuture = chatGPT3Service.getChatResult(openAiService, request);
 
     /* ================ 回写数据 ================= */
     /*
      * 当得到响应后，需要将用户的问题与AI回答原文、缩略更新到MongoDB中
      * 这个操作可以异步完成
      */
+    try {
+      ChatCompletionResult result = resultFuture.get();
+      // TODO 判断结束原因，只有正常结束的才插入数据库，记录上下文信息
+      ChatCompletionChoice choice = result.getChoices().get(0);          // 尽管这里是一个列表，但实际上只有一个元素
+      String finishReason = choice.getFinishReason();
+      ChatMessage message = choice.getMessage();
+      if (FinishReasons.STOP.getDesc().equals(finishReason)) {           // 如果是正常结束，则将上下文数据插入数据库
 
-
-
-    /* ============= Model & View ============== */
-    modelMap.addAttribute("formData", openAiDto);
-    modelMap.addAttribute("originList", originList);      //用来展示的原始上下文信息
-    if (StringUtils.isEmpty(apiKey))
-      modelMap.addAttribute("result", "您提供的api-key不正确，请确认！");
-    else {
-      try {
-        modelMap.addAttribute("result", result.get().getChoices().get(0).getMessage().getContent());
-      } catch (InterruptedException | ExecutionException e) {
-        log.error("==> 异步调用ChatGPT API异常", e);
-        modelMap.addAttribute("result", "后端服务异常！请联系管理员或稍后重试");
       }
+
+      /* ============= Model & View ============== */
+      modelMap.addAttribute("formData", openAiDto);
+      modelMap.addAttribute("originList", originList);      // 用来展示的原始上下文信息
+      if (StringUtils.isEmpty(apiKey))
+        modelMap.addAttribute("result", "您提供的api-key不正确，请确认！");
+      else
+        modelMap.addAttribute("result", message.getContent());
+
+
+    } catch (InterruptedException | ExecutionException e) {
+      log.error("==> 异步调用ChatGPT API异常", e);
+      modelMap.addAttribute("result", "后端服务异常！请联系管理员或稍后重试");
     }
+
     return "index";
   }
 

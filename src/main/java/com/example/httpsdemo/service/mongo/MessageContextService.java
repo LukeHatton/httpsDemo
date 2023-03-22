@@ -1,5 +1,6 @@
 package com.example.httpsdemo.service.mongo;
 
+import cn.hutool.core.lang.generator.SnowflakeGenerator;
 import cn.hutool.json.JSON;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONConverter;
@@ -33,9 +34,13 @@ public class MessageContextService {
 
   private final JSONConverter jsonConverter;
 
-  public MessageContextService(MessageContextRepository messageContextRepository, JSONConverter jsonConverter) {
+  private final SnowflakeGenerator snowflakeGenerator;
+
+  public MessageContextService(MessageContextRepository messageContextRepository, JSONConverter jsonConverter,
+                               SnowflakeGenerator snowflakeGenerator) {
     this.messageContextRepository = messageContextRepository;
     this.jsonConverter = jsonConverter;
+    this.snowflakeGenerator = snowflakeGenerator;
   }
 
   public List<MessageContextDao> findAll() {
@@ -46,13 +51,23 @@ public class MessageContextService {
     return messageContextRepository.findById(id).orElse(null);
   }
 
-  // 从MessageContextDao对象中获取摘要数据，并转换为ChatMessage列表
+  /**
+   * 从MessageContextDao对象中获取摘要数据，并转换为ChatMessage列表
+   *
+   * @param messageContextDao 封装上下文数据
+   * @return ChatMessage列表 如果参数为null则返回empty List
+   */
   public List<ChatMessage> getSummaryListFromMessageContext(MessageContextDao messageContextDao) {
     return getChatListFromMessageContext(messageContextDao, "summary");
   }
 
 
-  // 从MessageContextDao对象中获取原文数据，并转换为ChatMessage列表
+  /**
+   * 从MessageContextDao对象中获取原文数据，并转换为ChatMessage列表
+   *
+   * @param messageContextDao 封装上下文数据
+   * @return ChatMessage列表 如果参数为null则返回empty List
+   */
   public List<ChatMessage> getOriginListFromMessageContext(MessageContextDao messageContextDao) {
     return getChatListFromMessageContext(messageContextDao, "origin");
   }
@@ -66,7 +81,7 @@ public class MessageContextService {
    */
   public List<ChatMessage> getChatListFromMessageContext(MessageContextDao messageContextDao, String key) {
     if (messageContextDao == null)
-      return null;
+      return Collections.emptyList();
 
     String message = "origin".equals(key)
       ? messageContextDao.getOrigin()
@@ -104,9 +119,75 @@ public class MessageContextService {
       ? ChatCompletionTemplate.FIRST_QUESTION
       : ChatCompletionTemplate.QUESTION_IN_CONTEXT;
 
-    String question = prompt.replace("问题写在这里", content);  // 生成最终问题
+    String question = prompt.replace("问题写在这里", content);  // 嵌入问题模板，生成最终问题
     list.add(new ChatMessage(ChatCompletionRoles.USER.getRole(), question));
     return list;
   }
+
+
+  /**
+   * 将对象保存到数据库。如果数据库中已有相同objectId的对象，则更新
+   *
+   * @param messageContextDao 数据对象
+   */
+  public void saveContext(MessageContextDao messageContextDao) {
+    messageContextRepository.save(messageContextDao);
+  }
+
+  /**
+   * 解析{@link ChatMessage}对象，并追加到{@link MessageContextDao}对象中
+   * <p>
+   * 如果传入的messageContextDao是null，说明这是会话列表中的第一个对话，需要生成新的MessageContextDao对象
+   * TODO 目前这个方法的实现过于复杂了，不需要在Java代码中手动进行json转化，spring data mongodb会自动完成这项工作。明天改进
+   *
+   * @param chatMessage       对响应结果的简易封装
+   * @param messageContextDao 当前的上下文对象
+   * @return 追加写入后的messageContextDao对象
+   */
+  private MessageContextDao convertChatMessageToContextDao(ChatMessage chatMessage,
+                                                           MessageContextDao messageContextDao) {
+    String role = chatMessage.getRole();
+    String content = chatMessage.getContent();
+    String originFromResponse = getOriginFromResponse(content);                         // 相应内容原文
+    String summaryFromResponse = getSummaryFromResponse(content);                       // 响应内容摘要
+    ChatMessage originChatMessage = new ChatMessage(role, originFromResponse);          // 记录到DB的原文（origin）字段
+    ChatMessage summaryChatMessage = new ChatMessage(role, summaryFromResponse);        // 记录到DB的摘要（summary）字段
+
+    JSON convertOrigin = jsonConverter.convert(originChatMessage, null);    // mongodb仅支持json格式
+    JSON convertSummary = jsonConverter.convert(summaryChatMessage, null);
+    if (messageContextDao == null)
+      return MessageContextDao.builder()
+        .id(snowflakeGenerator.next().toString())
+        .origin(convertOrigin.toString())
+        .summary(convertSummary.toString())
+        .build();
+
+
+    String origin = messageContextDao.getOrigin();
+    String summary = messageContextDao.getSummary();
+    // 解析响应内容，并从中找出响应原文和响应缩略。这可以通过prompt中的关键字判断
+    String jsonStringToBeAppendedToOrigin = convertOrigin.toString();
+    String jsonStringToBeAppendedToSummary = convertSummary.toString();
+    origin = origin.replace("]", "," + jsonStringToBeAppendedToOrigin + "]");
+    summary = summary.replace("]", "," + jsonStringToBeAppendedToSummary + "]");
+
+    messageContextDao.setOrigin(origin);
+    messageContextDao.setSummary(summary);
+
+    return messageContextDao;
+  }
+
+  // 从响应内容中取得对用户问题的回答原文
+  public String getOriginFromResponse(String response) {
+    int i = response.indexOf("|summary|:");
+    return response.substring(0, i);
+  }
+
+  // 从响应内容中取得对用户问题的回答摘要
+  public String getSummaryFromResponse(String response) {
+    int i = response.indexOf("|summary|:");
+    return response.substring(i, response.length() - 1);
+  }
+
 
 }
