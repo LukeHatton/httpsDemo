@@ -32,6 +32,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- 自定义配置选项 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+        </dependency>
         <!-- 模板引擎 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
