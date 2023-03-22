@@ -66,17 +66,27 @@ public class JumpController {
 
     /* ================ 构建请求 ================= */
     String objectId = openAiDto.getObjectId();
-    String apiKey = openAiDto.getApiKey();
+    // String apiKey = openAiDto.getApiKey();
+    String apiKey = "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";  // 暂且使用固定的api-key
     String content = openAiDto.getContent();
     log.info("==> 接收到表单提交数据：objectId={}, api-key={}, content={}", objectId, apiKey, content);
+    /*
+     * 如果object==null，说明这是一个新请求，应获取初始问题模板
+     * 而若object!=null，说明这是一个在某个上下文中的请求，应查询数据库获取其上下文信息
+     * 无论如何，这个信息都应被封装为一个ChatMessage的List。这个操作应当在service层完成
+     * 输入：objectId  输出：List<ChatMessage>
+     */
     // 将缩略上下文封装到模型上下文List中
     MessageContextDao messageContextDao = messageContextService.findWithId(objectId);
-    List<ChatMessage> chatMessageList = messageContextService.getSummaryListFromMessageContext(messageContextDao);
-    chatMessageList.add(new ChatMessage("user", content));
+    List<ChatMessage> originList = messageContextService              // 用来展示
+      .getOriginListFromMessageContext(messageContextDao);
+    List<ChatMessage> summaryList = messageContextService             // 用来实际发送消息
+      .getSummaryListFromMessageContext(messageContextDao);
+    List<ChatMessage> list = messageContextService.constructRequestMessageList(content, summaryList);
 
     ChatCompletionRequest request = ChatCompletionRequest.builder()
       .model("gpt-3.5-turbo")
-      .messages(chatMessageList)
+      .messages(list)
       .temperature(0.6)
       .maxTokens(2048)
       .build();
@@ -97,6 +107,7 @@ public class JumpController {
 
     /* ============= Model & View ============== */
     modelMap.addAttribute("formData", openAiDto);
+    modelMap.addAttribute("originList", originList);      //用来展示的原始上下文信息
     if (StringUtils.isEmpty(apiKey))
       modelMap.addAttribute("result", "您提供的api-key不正确，请确认！");
     else {
